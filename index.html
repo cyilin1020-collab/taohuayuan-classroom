@@ -119,7 +119,7 @@ function resetQuiz(){state.answers={};document.getElementById('quizScore').textC
 function saveReflection(){state.reflection=document.getElementById('reflection').value;save();let f=document.getElementById('fb-reflect');let n=state.reflection.trim().length;f.innerHTML='<b>'+(n>=50?'反思已保存，已達 50 字。':'內容已保存，目前 '+n+' 字，建議至少 50 字。')+'</b><br>'+buildFeedback(state.reflection,'reflection');f.classList.add('show');if(n>=50)complete('reflect')}
 function buildFeedback(raw,type){let t=(raw||'').trim();if(!t)return '先寫下你的想法，再提交就能收到具體建議。';let tips=[],praise=[];if(t.length>=35)praise.push('你有把想法說清楚，已經不只是單純選擇立場。');else tips.push('可以再多寫一兩句，補充原因或例子。');if(/因為|所以|因此|由於|讓我覺得|我認為/.test(t))praise.push('你有表達理由，這讓回答更有說服力。');else tips.push('試著加入「因為……所以……」，把想法與原因連起來。');if(/桃花源|漁人|村民|課文|原文|緣溪行|忘路之遠近|黃髮|垂髫|良田|美池|乃不知有漢|秦|避亂|時間|空間/.test(t))praise.push('你有連結課文內容，這是很好的文本依據。');else tips.push('建議引用一處課文線索，例如「土地平曠」、「乃不知有漢」或「緣溪行，忘路之遠近」。');if(type==='spaceThought'&&!/山口|狹|豁然|空間|隔絕|轉換|未知/.test(t))tips.push('這題可以再思考「初極狹，纔通人，復行數十步，豁然開朗」如何營造由狹窄到開闊的空間轉換。');if(type==='stance'&&!/存在|想像|理想|真實|證據|可能/.test(t))tips.push('可以說明你判斷桃花源是真實存在或理想想像的依據。');if(type==='reflection'&&!/外人|消息|隱居|村民|漁人|安全|自由|戰亂|生活/.test(t))tips.push('可進一步談談對村民生活、安全、自由或外界戰亂的考量。');return '<span style="color:#557b68"><b>做得好的地方：</b></span>'+(praise.length?praise.join(' '):'你已經開始表達自己的觀點。')+'<br><span style="color:#9b6870"><b>下一步可以加強：</b></span>'+(tips.length?tips.join(' '):'目前回答已包含理由與文本線索，可以再試著提出不同角度或反例。')+'<br><b>加分句型：</b>「我認為……，因為課文提到……，這讓我想到……。」'}
 function restore(){document.getElementById('dreamArtPrompt').value=state.dreamArtPrompt||'';document.getElementById('dreamReason').value=state.dreamReason||'';document.getElementById('spaceThought').value=state.spaceThought||'';document.getElementById('stanceReason').value=state.stanceReason||'';document.getElementById('reflection').value=state.reflection||'';document.querySelectorAll('#dreamChoices button').forEach(x=>x.classList.toggle('selected',state.dream.includes(x.textContent)));document.getElementById('dreamCount').textContent='已選 '+state.dream.length+' / 3';document.querySelectorAll('#stance button').forEach(x=>x.classList.toggle('selected',state.stance===x.textContent));document.querySelectorAll('#choice button').forEach(x=>x.classList.toggle('selected',state.choice===x.textContent));drawJourney();renderQuiz();updateProgress()}
-const IMAGE_API_ENDPOINT='/api/generate-image';
+const IMAGE_API_ENDPOINT='https://taohuayuan-image.cyilin1020.workers.dev/generate';
 let lastDreamArtUrl='';
 const dreamArtInput=document.getElementById('dreamArtPrompt');
 dreamArtInput.value=state.dreamArtPrompt||'';
@@ -128,13 +128,14 @@ document.getElementById('clearDreamArt').onclick=()=>{dreamArtInput.value='';sta
 document.getElementById('generateDreamArt').onclick=async()=>{
  const prompt=dreamArtInput.value.trim(),status=document.getElementById('dreamArtStatus'),btn=document.getElementById('generateDreamArt');
  if(prompt.length<12){status.textContent='再多描述一點吧！至少寫 12 個字，讓畫面更有細節。';status.classList.add('show');return}
- if(prompt.length>700){status.textContent='內容太長了，請控制在 700 字以內。';status.classList.add('show');return}
+ if(prompt.length>500)
  state.dreamArtPrompt=prompt;save();btn.disabled=true;btn.textContent='正在描繪你的桃花源…';status.textContent='正在把你的文字轉化成水墨桃花源，請稍候。';status.classList.add('show');
  try{
   const res=await fetch(IMAGE_API_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,style:'Chinese watercolor and ink landscape, soft peach-pink blossoms, misty celadon mountains, tranquil stream, warm ivory paper texture, poetic utopia, no text, no watermark',aspect_ratio:'16:9'})});
   if(!res.ok){let msg='圖片服務暫時無法使用（HTTP '+res.status+'）。';try{const e=await res.json();if(e.error)msg=e.error}catch(_){}throw new Error(msg)}
-  const data=await res.json();const url=data.image_url||data.url||(data.image_base64?'data:image/png;base64,'+data.image_base64:null);
-  if(!url)throw new Error('圖片服務已回應，但沒有提供 image_url 或 image_base64。請檢查後端回傳格式。');
+  const data=await res.json();
+const url=data.dataURI||data.image_url||(data.image_base64?`data:image/png;base64,${data.image_base64}`:null);
+ if(!url)throw new Error('圖片服務已回應，但沒有提供圖片資料。請檢查後端回傳格式。');
   lastDreamArtUrl=url;document.getElementById('dreamArtImage').src=url;document.getElementById('dreamArtCaption').textContent='我的桃花源：'+prompt;document.getElementById('dreamArtResult').style.display='block';status.textContent='完成！你的桃花源已經生成。你可以下載圖片，或修改描述後重新生成。';status.classList.add('show');
  }catch(err){status.textContent='目前尚未成功生成圖片：'+err.message+'。這個 HTML 需要先連接圖片生成後端；單獨以本機檔案開啟時，不會自動連上圖片模型。';status.classList.add('show')}
  finally{btn.disabled=false;btn.textContent='重新生成我的桃花源'}
